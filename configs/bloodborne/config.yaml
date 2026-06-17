@@ -1,0 +1,11 @@
+game: Bloodborne
+reasons:
+  - name: death
+    interval: 60
+    template: youdied.png
+    threshold: 0.1
+    zone:
+      x-min: 600
+      x-max: 1310
+      y-min: 200
+      y-max: 332

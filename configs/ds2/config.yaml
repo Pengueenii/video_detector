@@ -1,0 +1,12 @@
+game: Dark Souls 2
+reasons:
+  - name: death
+    interval: 45
+    template: youdied.png
+    threshold: 0.2
+    zone:
+      x-min: 500
+      x-max: 1410
+      y-min: 600
+      y-max: 940
+
