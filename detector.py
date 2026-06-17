@@ -106,7 +106,9 @@ def initialize_video(url: str) -> str:
     return ""
 
 
-def process_frame(capture: cv2.VideoCapture, frame_number: int, reasons: list[Reason]):
+def process_frame(
+    capture: cv2.VideoCapture, frame_number: int, output: Path, reasons: list[Reason]
+):
     msec = capture.get(cv2.CAP_PROP_POS_MSEC)
     vid_time = str(datetime.timedelta(milliseconds=msec)).split(".")[0]
 
@@ -134,7 +136,7 @@ def process_frame(capture: cv2.VideoCapture, frame_number: int, reasons: list[Re
             if reason.found and not is_found:
                 print(" Found", reason.name)
                 cv2.imwrite(
-                    filename=f"frames/{reason.name}_{vid_time.replace(':', '_')}.jpg",
+                    filename=f"{output}/{reason.name}_{vid_time.replace(':', '_')}.jpg",
                     img=reason.prev_frame,
                 )
 
@@ -144,7 +146,7 @@ def process_frame(capture: cv2.VideoCapture, frame_number: int, reasons: list[Re
             reason.found = is_found
 
 
-def process_video(video: str, config: GameConfig, time_ms: int):
+def process_video(video: str, config: GameConfig, time_ms: int, output: Path):
     capture = cv2.VideoCapture(video)
     if not capture.isOpened():
         print("Could not open stream link")
@@ -152,16 +154,25 @@ def process_video(video: str, config: GameConfig, time_ms: int):
 
     capture.set(cv2.CAP_PROP_POS_MSEC, time_ms)
 
+    output.mkdir(parents=True, exist_ok=True)
+
     frame_count = 0
     success = True
     while success:
         success = capture.grab()
-        process_frame(capture, frame_count, config.reasons)
+        process_frame(capture, frame_count, output, config.reasons)
         frame_count += 1
 
 
 @click.command
 @click.option("-t", "--time", help="time to start at (HH:MM:SS)", default="00:00:00")
+@click.option(
+    "-o",
+    "--output",
+    help="Folder to output files",
+    default="frames",
+    type=click.Path(path_type=Path),
+)
 @click.option(
     "-g",
     "--game",
@@ -171,7 +182,7 @@ def process_video(video: str, config: GameConfig, time_ms: int):
 @click.argument(
     "VIDEO_URL",
 )
-def main(time: str, video_url: str, game: str):
+def main(time: str, video_url: str, game: str, output: Path):
     """
     Parses through a video finding occurences of reference images, this program assumes the video is 1920x1080
     """
@@ -182,7 +193,7 @@ def main(time: str, video_url: str, game: str):
     time_ms = time_to_ms(time)
 
     try:
-        process_video(vid, gameconfig, time_ms)
+        process_video(vid, gameconfig, time_ms, output)
     except KeyboardInterrupt:
         pass
 
