@@ -81,29 +81,14 @@ def time_to_ms(time: str) -> int:
     return ((dt.hour * 3600) + (dt.minute * 60) + dt.second) * 1000
 
 
-def fetch_vod(url: str) -> str:
+def fetch_video(url: str) -> str:
     with yt_dlp.YoutubeDL(YDLP_OPTS) as vod:
-        print("Fetching VOD metadata")
+        print("Fetching Video metadata")
         info = vod.extract_info(url, download=False)
         stream_url = info.get("url")
         if not stream_url:
             raise ValueError("No video URL found")
         return stream_url
-
-
-def initialize_video(url: str) -> str:
-    res = urlparse(url)
-    if not res.hostname or "twitch.tv" not in res.hostname:
-        raise ValueError("Url is not a valid twitch url")
-
-    if not res.path:
-        raise ValueError("No path provded in url")
-
-    if "videos" in res.path or "clip" in res.path:
-        print("Processing VOD")
-        return fetch_vod(url)
-
-    return ""
 
 
 def process_frame(
@@ -147,6 +132,7 @@ def process_frame(
 
 
 def process_video(video: str, config: GameConfig, time_ms: int, output: Path):
+    print("Processing video")
     capture = cv2.VideoCapture(video)
     if not capture.isOpened():
         print("Could not open stream link")
@@ -190,7 +176,7 @@ def main(time: str, video_url: str, game: str, output: Path):
 
     start = datetime.datetime.now()
     gameconfig = load_game(game)
-    vid = initialize_video(video_url)
+    vid = fetch_video(video_url)
     time_ms = time_to_ms(time)
 
     try:
