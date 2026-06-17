@@ -1,13 +1,18 @@
+import os
 import datetime
 import cv2
 import click
 import yt_dlp
 import yaml
+import time
+from urllib.parse import urlparse
 from typing import Optional
 from dataclasses import dataclass, field
 from pathlib import Path
 
-YDLP_OPTS = {"format": "best", "quiet": True}
+os.environ["OPENCV_LOG_LEVEL"] = "OFF"
+os.environ["OPENCV_FFMPEG_LOGLEVEL"] = "-8"
+
 
 script_location = Path(__file__).parent
 config_folder = script_location / "configs"
@@ -78,14 +83,20 @@ def time_to_ms(time: str) -> int:
     return ((dt.hour * 3600) + (dt.minute * 60) + dt.second) * 1000
 
 
-def fetch_video(url: str) -> str:
-    with yt_dlp.YoutubeDL(YDLP_OPTS) as vod:
-        print("Fetching Video metadata")
-        info = vod.extract_info(url, download=False)
-        stream_url = info.get("url")
-        if not stream_url:
-            raise ValueError("No video URL found")
-        return stream_url
+def fetch_video(location: str, live: bool) -> str:
+    ytdlp_opts = {"format": "best", "quiet": True, "live_from_start": live}
+    res = urlparse(location)
+
+    if res.scheme:
+        with yt_dlp.YoutubeDL(ytdlp_opts) as vod:
+            print("Fetching Video metadata")
+            info = vod.extract_info(location, download=False)
+            stream_url = info.get("url")
+            if not stream_url:
+                raise ValueError("No video URL found")
+            return stream_url
+    else:
+        return res.path
 
 
 def process_frame(
@@ -128,7 +139,9 @@ def process_frame(
             reason.found = is_found
 
 
-def process_video(video: str, config: GameConfig, time_ms: int, output: Path):
+def process_video(
+    video: str, config: GameConfig, time_ms: int, output: Path, live: bool
+):
     print("Processing video")
     capture = cv2.VideoCapture(video)
     if not capture.isOpened():
@@ -140,11 +153,19 @@ def process_video(video: str, config: GameConfig, time_ms: int, output: Path):
     output.mkdir(parents=True, exist_ok=True)
 
     frame_count = 0
+    last_time = 0
     success = True
-    while success:
+    while success or live:
         success = capture.grab()
+        if not success and live:
+            time.sleep(1)  # Arbitrarily wait
+            capture.open(video)
+            capture.set(cv2.CAP_PROP_POS_MSEC, last_time)
+            continue
+
         process_frame(capture, frame_count, output, config.reasons)
         frame_count += 1
+        last_time = capture.get(cv2.CAP_PROP_POS_MSEC)
 
 
 @click.command
@@ -163,21 +184,28 @@ def process_video(video: str, config: GameConfig, time_ms: int, output: Path):
     help="Game to process",
     required=True,
 )
-@click.argument(
-    "VIDEO_URL",
+@click.option(
+    "-l",
+    "--live",
+    is_flag=True,
+    default=False,
+    help="Indicates if the file or url is a live representation of the video",
 )
-def main(time: str, video_url: str, game: str, output: Path):
+@click.argument(
+    "VIDEO_URL_OR_FILE",
+)
+def main(time: str, video_url_or_file: str, game: str, output: Path, live: bool):
     """
     Parses through a video finding occurences of reference images, this program assumes the video is 1920x1080
     """
 
     start = datetime.datetime.now()
     gameconfig = load_game(game)
-    vid = fetch_video(video_url)
+    vid = fetch_video(video_url_or_file, live)
     time_ms = time_to_ms(time)
 
     try:
-        process_video(vid, gameconfig, time_ms, output)
+        process_video(vid, gameconfig, time_ms, output, live)
     except KeyboardInterrupt:
         pass
 
