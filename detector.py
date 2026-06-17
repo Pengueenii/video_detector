@@ -1,9 +1,6 @@
-import os
-import argparse
 import datetime
 import cv2
 import click
-from urllib.parse import urlparse
 import yt_dlp
 import yaml
 from typing import Optional
