@@ -177,7 +177,8 @@ def process_video(video: str, config: GameConfig, time_ms: int, output: Path):
     "-g",
     "--game",
     type=click.Choice(get_configs()),
-    help="Choosing a game helps remove false positives",
+    help="Game to process",
+    required=True,
 )
 @click.argument(
     "VIDEO_URL",
