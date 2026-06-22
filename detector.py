@@ -1,6 +1,5 @@
 import os
 import datetime
-import cv2
 import click
 import yt_dlp
 import yaml
@@ -10,8 +9,11 @@ from typing import Optional
 from dataclasses import dataclass, field
 from pathlib import Path
 
-os.environ["OPENCV_LOG_LEVEL"] = "OFF"
+os.environ["OPENCV_LOG_LEVEL"] = "SILENT"
 os.environ["OPENCV_FFMPEG_LOGLEVEL"] = "-8"
+os.environ["SYS_LOG_LEVEL"] = "ERROR"
+
+import cv2
 
 
 script_location = Path(__file__).parent
@@ -103,6 +105,7 @@ def process_frame(
     capture: cv2.VideoCapture, frame_number: int, output: Path, reasons: list[Reason]
 ):
     msec = capture.get(cv2.CAP_PROP_POS_MSEC)
+    capture.set(cv2.CAP_PROP_BUFFERSIZE, 3)
     vid_time = str(datetime.timedelta(milliseconds=msec)).split(".")[0]
 
     print(
@@ -113,7 +116,9 @@ def process_frame(
 
     for reason in reasons:
         if frame_number % reason.interval == 0:
-            _, frame = capture.retrieve()
+            success, frame = capture.retrieve()
+            if not success:
+                continue
 
             roi = frame
             if reason.x_min and reason.x_max and reason.y_min and reason.y_max:
@@ -148,8 +153,6 @@ def process_video(
         print("Could not open stream link")
         return
 
-    capture.set(cv2.CAP_PROP_POS_MSEC, time_ms)
-
     output.mkdir(parents=True, exist_ok=True)
 
     frame_count = 0
@@ -158,7 +161,7 @@ def process_video(
     while success or live:
         success = capture.grab()
         if not success and live:
-            time.sleep(1)  # Arbitrarily wait
+            time.sleep(10)  # Arbitrarily wait
             capture.open(video)
             capture.set(cv2.CAP_PROP_POS_MSEC, last_time)
             continue
@@ -198,7 +201,6 @@ def main(time: str, video_url_or_file: str, game: str, output: Path, live: bool)
     """
     Parses through a video finding occurences of reference images, this program assumes the video is 1920x1080
     """
-
     start = datetime.datetime.now()
     gameconfig = load_game(game)
     vid = fetch_video(video_url_or_file, live)
