@@ -153,6 +153,8 @@ def process_video(
         print("Could not open stream link")
         return
 
+    capture.set(cv2.CAP_PROP_POS_MSEC, time_ms)
+
     output.mkdir(parents=True, exist_ok=True)
 
     frame_count = 0
